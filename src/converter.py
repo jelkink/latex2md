@@ -22,6 +22,7 @@ class Converter:
     self.handle_formatting()
     self.handle_section_headers()
     self.handle_footnotes()
+    self.handle_bibliography()
     self.handle_complex_environments()
     self.handle_remaining_references()
     self.remove_remaining_commands()
@@ -162,19 +163,57 @@ class Converter:
         self.markdown_content += f"[^{number}]: {text}\n"
 
   def handle_bibliography(self):
-    self.markdown_content = re.sub(r'\\cite\{(.*?)\}', r'[@\1]', self.markdown_content)
-    
-    with open(self.bib_file) as bibtex_file:
+
+    def extract_last_names(authors_field):
+      # Split the authors by "and" to handle multiple authors
+      authors = [author.strip() for author in authors_field.split(' and ')]
+
+      last_names = []
+      for author in authors:
+          # Handle "Last, First" format
+          if ',' in author:
+              last_name = author.split(',')[0].strip()
+          else:
+              # Handle "First Last" format by assuming the last word is the last name
+              last_name = author.split()[-1].strip()
+          last_names.append(last_name)
+
+      if len(last_names) > 1:
+        return ', '.join(last_names[:-1]) + ' and ' + last_names[-1]
+      else:
+        return last_names[0]
+  
+    def get_entry(key):
+      for entry in bib_database.entries:
+        if key == entry.get("ID"):
+          return entry
+      
+      print(f"Warning: Key '{key}' not found in bibliography entries.")
+      return None
+
+    def replace_citep(match):
+      keys = [key.strip() for key in match.group(1).split(',')]
+      citations = []
+      for key in keys:
+        entry = get_entry(key)
+        if entry:
+          citations.append(f"{extract_last_names(entry.get('author', 'Unknown Author'))}, {entry.get('year', 'n.d.')}")
+      return '(' + '; '.join(citations) + ')'
+
+    def replace_citet(match):
+      keys = [key.strip() for key in match.group(1).split(',')]
+      citations = []
+      for key in keys:
+        entry = get_entry(key)
+        if entry:
+          citations.append(f"{extract_last_names(entry.get('author', 'Unknown Author'))} ({entry.get('year', 'n.d.')})")
+      return '; '.join(citations)
+
+    with open(self.bib_file, errors='replace') as bibtex_file:
       bib_database = bibtexparser.load(bibtex_file)
 
-    entries = {}
-    for entry in bib_database.entries:
-      citation_key = entry.get("ID")
-      formatted_entry = f"{entry.get('author', 'Unknown Author')} ({entry.get('year', 'n.d.')}): {entry.get('title', 'No Title')}"
-      entries[citation_key] = formatted_entry
-
-    for key, citation_text in entries.items():
-      self.markdown_content = re.sub(rf'@{key}', citation_text, self.markdown_content)
+    self.markdown_content = re.sub(r'\\citep\{(.*?)\}', replace_citep, self.markdown_content)
+    self.markdown_content = re.sub(r'\\citet\{(.*?)\}', replace_citet, self.markdown_content)
   
   def handle_newcommands(self):
 
