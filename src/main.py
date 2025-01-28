@@ -26,8 +26,7 @@ def main():
     file.write(converter.get_markdown_content())
 
   if write_word:
-    with open(filename + ".docx", "wb") as docx_file:
-      docx_file.write(converter.get_word_content())
+    converter.export_word_content(filename + ".docx")
 
 if __name__ == "__main__":
   main()
