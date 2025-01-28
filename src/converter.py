@@ -13,6 +13,7 @@ class Converter:
     self.section_counter = [0, 0, 0]
     self.label_map = {} 
     self.footnotes = {}
+    self.bibliography_keys = []
 
   def process(self):
     self.markdown_content = self.latex_content
@@ -29,6 +30,7 @@ class Converter:
     
     if self.bib_file:
       self.handle_bibliography()
+      self.append_bibliography()
 
   def get_markdown_content(self):
     return self.markdown_content
@@ -162,59 +164,99 @@ class Converter:
       for number, text in self.footnotes.items():
         self.markdown_content += f"[^{number}]: {text}\n"
 
-  def handle_bibliography(self):
-
-    def extract_last_names(authors_field):
-      # Split the authors by "and" to handle multiple authors
-      authors = [author.strip() for author in authors_field.split(' and ')]
-
-      last_names = []
-      for author in authors:
-          # Handle "Last, First" format
-          if ',' in author:
-              last_name = author.split(',')[0].strip()
-          else:
-              # Handle "First Last" format by assuming the last word is the last name
-              last_name = author.split()[-1].strip()
-          last_names.append(last_name)
-
-      if len(last_names) > 1:
-        return ', '.join(last_names[:-1]) + ' and ' + last_names[-1]
-      else:
-        return last_names[0]
+  def get_entry(self, key):
+    for entry in self.bib_database.entries:
+      if key == entry.get("ID"):
+        if key not in self.bibliography_keys:
+            self.bibliography_keys.append(key)
+        return entry
+    
+    print(f"Warning: Key '{key}' not found in bibliography entries.")
+    return None
   
-    def get_entry(key):
-      for entry in bib_database.entries:
-        if key == entry.get("ID"):
-          return entry
-      
-      print(f"Warning: Key '{key}' not found in bibliography entries.")
-      return None
+  def extract_last_names(self, authors_field):
+    # Split the authors by "and" to handle multiple authors
+    authors = [author.strip() for author in authors_field.split(' and ')]
+
+    last_names = []
+    for author in authors:
+        # Handle "Last, First" format
+        if ',' in author:
+            last_name = author.split(',')[0].strip()
+        else:
+            # Handle "First Last" format by assuming the last word is the last name
+            last_name = author.split()[-1].strip()
+        last_names.append(last_name)
+
+    if len(last_names) > 1:
+      return ', '.join(last_names[:-1]) + ' and ' + last_names[-1]
+    else:
+      return last_names[0]
+
+  def handle_bibliography(self):
 
     def replace_citep(match):
       keys = [key.strip() for key in match.group(1).split(',')]
       citations = []
       for key in keys:
-        entry = get_entry(key)
+        entry = self.get_entry(key)
         if entry:
-          citations.append(f"{extract_last_names(entry.get('author', 'Unknown Author'))}, {entry.get('year', 'n.d.')}")
+          citations.append(f"{self.extract_last_names(entry.get('author', 'Unknown Author'))} {entry.get('year', 'n.d.')}")
       return '(' + '; '.join(citations) + ')'
 
     def replace_citet(match):
       keys = [key.strip() for key in match.group(1).split(',')]
       citations = []
       for key in keys:
-        entry = get_entry(key)
+        entry = self.get_entry(key)
         if entry:
-          citations.append(f"{extract_last_names(entry.get('author', 'Unknown Author'))} ({entry.get('year', 'n.d.')})")
+          citations.append(f"{self.extract_last_names(entry.get('author', 'Unknown Author'))} ({entry.get('year', 'n.d.')})")
       return '; '.join(citations)
 
     with open(self.bib_file, errors='replace') as bibtex_file:
-      bib_database = bibtexparser.load(bibtex_file)
+      self.bib_database = bibtexparser.load(bibtex_file)
 
     self.markdown_content = re.sub(r'\\citep\{(.*?)\}', replace_citep, self.markdown_content)
     self.markdown_content = re.sub(r'\\citet\{(.*?)\}', replace_citet, self.markdown_content)
   
+  def append_bibliography(self):
+
+    def format_apsa_entry(entry):
+      """Format a BibTeX entry in APSA style for Markdown."""
+      entry_type = entry.get('ENTRYTYPE', '').lower()
+      author = entry.get('author', 'No Author').replace(' and ', ', ')
+      year = f"({entry.get('year', 'n.d.')})"
+      title = entry.get('title', 'Untitled')
+
+      if entry_type == 'article':
+          journal = entry.get('journal', '')
+          volume = entry.get('volume', '')
+          issue = entry.get('number', '')
+          pages = entry.get('pages', '')
+          formatted_entry = f"{author} {year}. \"{title}.\" *{journal}* {volume}({issue}): {pages}."
+
+      elif entry_type == 'book':
+          publisher = entry.get('publisher', '')
+          formatted_entry = f"{author} {year}. *{title}*. {publisher}."
+
+      elif entry_type == 'inproceedings':
+          booktitle = entry.get('booktitle', '')
+          pages = entry.get('pages', '')
+          formatted_entry = f"{author} {year}. \"{title}.\" In *{booktitle}*, pp. {pages}."
+
+      else:
+          formatted_entry = f"{author} {year}. *{title}*."
+
+      return formatted_entry
+    
+    self.markdown_content += "\n\n## References\n"
+
+    for key in self.bibliography_keys:
+      entry = self.get_entry(key)
+      if entry:
+        self.markdown_content += format_apsa_entry(entry) + '\n\n'
+
+
   def handle_newcommands(self):
 
     def extract_newcommands(self, latex_text):
