@@ -41,7 +41,12 @@ class Converter:
     pypandoc.convert_text(text, "docx", format="md", outputfile=filename)
   
   def remove_comments(self):
-    self.markdown_content = re.sub(r'%.*?\n', '', self.markdown_content, flags=re.DOTALL)
+    def replace_percent(match):
+      if match.group(0).startswith(r'\%'):
+        return match.group(0)[1:]  # Remove the escaping backslash
+      return ''  # Remove the comment
+
+    self.markdown_content = re.sub(r'\\%|%.*?\n', replace_percent, self.markdown_content, flags=re.DOTALL)
 
   def remove_remaining_commands(self):
     commands = re.findall(r'\\[a-zA-Z]+\*?(?:\[[^\]]*\])?(?:\{[^\}]*\})?', self.markdown_content)
