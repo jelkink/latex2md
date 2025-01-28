@@ -8,6 +8,9 @@ class Converter:
     self.bib_file = bib_file
     self.latex_content = latex_content
     self.markdown_content = ""
+    self.figure_count = 1
+    self.table_count = 1
+    self.label_map = {} 
 
   def process(self):
     self.markdown_content = self.latex_content
@@ -41,14 +44,40 @@ class Converter:
 
   def handle_complex_environments(self):
     self.markdown_content = re.sub(r'\\begin\{figure\}.*?\\end\{figure\}', 
-                     '![Figure X here](#)', self.markdown_content, flags=re.DOTALL)
+                     self.replace_figure, self.markdown_content, flags=re.DOTALL)
     
     self.markdown_content = re.sub(r'\\begin\{table\}.*?\\end\{table\}', 
-                     '**[Table X here]**', self.markdown_content, flags=re.DOTALL)
+                     self.replace_table, self.markdown_content, flags=re.DOTALL)
 
     self.markdown_content = re.sub(r'\\begin\{equation\}.*?\\end\{equation\}', 
                      '[Equation X here]', self.markdown_content, flags=re.DOTALL)
     
+    def replace_ref(match):
+      label = match.group(1)
+      return f"{self.label_map.get(label, f'Unknown {label}')}"
+        
+    self.markdown_content = re.sub(r'\\ref{(.*?)}', replace_ref, self.markdown_content)
+  
+  def replace_figure(self, match):
+    figure_content = match.group(0)
+    figure_label = self.extract_label(figure_content)
+    figure_text = f"![Figure {self.figure_count} here]"
+    self.label_map[figure_label] = f"Figure {self.figure_count}" if figure_label else None
+    self.figure_count += 1
+    return figure_text
+    
+  def replace_table(self, match):
+    table_content = match.group(0)
+    table_label = self.extract_label(table_content)
+    table_text = f"Table {self.table_count} here"
+    self.label_map[table_label] = f"Table {self.table_count}" if table_label else None
+    self.table_count += 1
+    return table_text
+  
+  def extract_label(self, content):
+    label_match = re.search(r'\\label{(.*?)}', content)
+    return label_match.group(1) if label_match else None
+  
   def handle_section_headers(self):
     self.markdown_content = re.sub(r'\\section\{(.*?)\}', r'# \1', self.markdown_content)
     self.markdown_content = re.sub(r'\\subsection\{(.*?)\}', r'## \1', self.markdown_content)
