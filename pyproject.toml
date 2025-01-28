@@ -1,0 +1,18 @@
+[project]
+name = "latex2md"
+version = "0.1.0"
+description = "A script to convert LaTeX to Word via Markdown."
+authors = [{name = "Jos Dornschneider-Elkink", email = "jos@joselkink.net"}]
+license = { file = "LICENSE" }
+
+dependencies = [
+  "bibtexparser>=1.4.0",
+  "pypandoc>=1.4.0"
+]
+
+[build-system]
+requires = ["setuptools", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project.scripts]
+latex2md = "main:main"
