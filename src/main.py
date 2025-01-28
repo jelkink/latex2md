@@ -23,11 +23,11 @@ def main():
   converter.process()
 
   with open(filename + ".md", "w") as file:
-    file.write(converter.markdown_content())
+    file.write(converter.get_markdown_content())
 
   if write_word:
     with open(filename + ".docx", "wb") as docx_file:
-      docx_file.write(converter.word_content())
+      docx_file.write(converter.get_word_content())
 
 if __name__ == "__main__":
   main()
